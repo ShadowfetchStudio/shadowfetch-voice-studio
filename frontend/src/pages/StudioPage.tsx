@@ -6,7 +6,8 @@ import { Textarea } from "@/components/ui/Field";
 import { Tabs } from "@/components/ui/Tabs";
 import { handleError, useAppStore } from "@/store/appStore";
 import { useSpeakStore } from "@/features/speak/speakStore";
-import type { StudioCatalog, StudioChapter, StudioDesign, StudioDubCue, StudioVoiceStudioStatus } from "@/lib/protocol";
+import type { SettingsPatch } from "@/lib/protocol";
+import type { StudioCatalog, StudioChapter, StudioDesign, StudioDubCue, StudioVoiceStudioStatus } from "@/lib/studioProtocol";
 
 type StudioTab = "design" | "dub" | "dictate" | "transcribe" | "audiobook" | "engine";
 
@@ -196,7 +197,8 @@ function DictatePanel({ onSpeak }: { onSpeak: (page: "speak") => void }) {
       } else {
         const stopped = await api.record.stop(session);
         setSession(null);
-        const path = stopped.working_path || stopped.path;
+        const extra = stopped as { working_path?: string | null };
+        const path = extra.working_path || stopped.path;
         const transcript = await api.transcribe.run({ path });
         setText(transcript.text);
       }
@@ -311,7 +313,7 @@ function EnginePanel({ initialUrl }: { initialUrl?: string }) {
   const check = async () => {
     setBusy(true);
     try {
-      await api.system.settingsSet({ voicestudio_url: url });
+      await api.system.settingsSet({ voicestudio_url: url } as SettingsPatch);
       setStatus(await api.studio.voiceStudioStatus(url));
     } catch (err) {
       handleError(err, "Couldn't reach VoiceStudio");
