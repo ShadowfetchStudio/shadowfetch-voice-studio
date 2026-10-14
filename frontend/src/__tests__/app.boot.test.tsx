@@ -116,9 +116,9 @@ describe("app boot waits for the worker", () => {
     const editor = await screen.findByRole("textbox", { name: "Text to speak" });
     expect(useAppStore.getState().page).toBe("speak");
     await waitFor(() => expect(editor).toHaveFocus());
-    // only two destinations in the main navigation, plus the Settings gear
+    // Speak, Studio, and Voices in the main navigation, plus the Settings gear
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(Array.from(nav.querySelectorAll("button")).map((b) => b.textContent)).toEqual(["Speak", "Voices"]);
+    expect(Array.from(nav.querySelectorAll("button")).map((b) => b.textContent)).toEqual(["Speak", "Studio", "Voices"]);
     expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
     expect(screen.getByText("Runs locally on your computer.")).toBeInTheDocument();
   });
