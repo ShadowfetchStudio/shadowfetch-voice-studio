@@ -92,3 +92,4 @@ See `MODEL_LICENSES.md` (Qwen3-TTS: Apache-2.0; Chatterbox-Turbo + Perth: MIT; f
 - LGPL components (libsndfile inside the soundfile wheel; FFmpeg/WebKitGTK as system packages): used unmodified as dynamically linked libraries or separate processes; users can replace them.
 - pykakasi (GPL-3.0-or-later) is a transitive dependency of `chatterbox-tts` installed only into the optional Chatterbox runtime on the user's machine; it is not linked into or shipped with the packaged application.
 - No component's terms are altered by this project. Shadowfetch Voice Studio's own code: see the repository `LICENSE`.
+- [VoiceStudio](https://github.com/debpalash/VoiceStudio) (AGPL-3.0-only, Copyright Palash Debnath and VoiceStudio contributors) is an optional separate program. `scripts/fetch-voicestudio.sh` downloads it into `third_party/VoiceStudio/`, which is not committed. This application talks to it over HTTP and does not relicense it.
