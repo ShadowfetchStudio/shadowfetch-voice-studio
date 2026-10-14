@@ -67,3 +67,6 @@ Thumbs.db
 
 # machine-specific bootstrap stamp
 backend/runtime.json
+
+# VoiceStudio checkout (AGPL-3.0). Fetched by scripts/fetch-voicestudio.sh.
+/third_party/VoiceStudio/
