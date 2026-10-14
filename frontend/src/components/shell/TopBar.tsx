@@ -27,15 +27,16 @@ export function LogoMark({ size = 28 }: { size?: number }) {
   );
 }
 
-/** The two places a person works in. Everything else lives behind the gear. */
+/** The places a person works in. Everything else lives behind the gear. */
 export const PRIMARY_PAGES: Array<{ page: Page; label: string }> = [
   { page: "speak", label: "Speak" },
+  { page: "studio", label: "Studio" },
   { page: "voices", label: "Voices" },
 ];
 
 const ADVANCED_TITLES: Partial<Record<Page, string>> = { setup: "System check", projects: "Projects", editor: "Project editor" };
 
-/** Top bar: name, Speak | Voices, and the Settings gear. Advanced tools show a way back to Settings. */
+/** Top bar: name, Speak | Studio | Voices, and the Settings gear. Advanced tools show a way back to Settings. */
 export function TopBar() {
   const page = useAppStore((s) => s.page);
   const navigate = useAppStore((s) => s.navigate);

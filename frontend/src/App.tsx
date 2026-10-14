@@ -13,6 +13,7 @@ import { useSpeakStore } from "@/features/speak/speakStore";
 import { ModelSetupDialog } from "@/features/setup/ModelSetupDialog";
 import { CloneVoiceDialog } from "@/features/voices/clone/CloneVoiceDialog";
 import SpeakPage from "@/pages/SpeakPage";
+import StudioPage from "@/pages/StudioPage";
 import VoicesPage from "@/pages/VoicesPage";
 import SettingsPage from "@/pages/SettingsPage";
 import SetupPage from "@/pages/SetupPage";
@@ -22,6 +23,7 @@ import CreatePage from "@/pages/CreatePage";
 /** Pages that fill the window themselves (Speak's editor grows with it); the rest scroll inside a padded column. */
 const PAGES: Record<Page, { render: () => ReactNode; bare?: boolean }> = {
   speak: { render: () => <SpeakPage />, bare: true },
+  studio: { render: () => <StudioPage /> },
   voices: { render: () => <VoicesPage />, bare: true },
   settings: { render: () => <SettingsPage /> },
   setup: { render: () => <SetupPage /> },
