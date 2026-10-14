@@ -9,7 +9,7 @@
 ┌───────────────▼──────────────────────────────┐        ┌──────────────▼────────────────┐
 │ main worker  python -m shadowfetch_worker    │        │ frontend  React+TS+Vite+Tailwind│
 │  rpc.py: dispatch, threads, cancel, GPU lock │        │  lib/api.ts (typed client)      │
-│  jobs/*: audio, record, transcribe, tts,     │        │  pages: Speak Voices Settings   │
+│  jobs/*: audio, record, transcribe, tts,     │        │  pages: Speak Studio Voices Settings │
 │          speak, voices, projects, library,   │        │  + Setup, Projects, Editor      │
 │          export, models, backup, engines,    │        │  components: Waveform, Meter…   │
 │          system                              │        │                                 │

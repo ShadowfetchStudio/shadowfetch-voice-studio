@@ -302,6 +302,8 @@ export interface Settings {
   speak_project_id?: string | null;
   /** Play a Speak result as soon as it is ready. */
   speak_autoplay?: boolean;
+  /** Optional VoiceStudio engine on this computer (loopback HTTP). */
+  voicestudio_url?: string;
   /** Save Audio: optional named loudness target (`export.loudness_targets` id). */
   export_loudness_target?: LoudnessTargetId | null;
   extra: Record<string, unknown>;

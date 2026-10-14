@@ -18,7 +18,7 @@ together — happens underneath.
 - **Transcription:** faster-whisper, CPU by default.
 - **Shell:** Tauri 2 (Rust) + React/TypeScript; Python workers for audio and inference; FFmpeg for media; SQLite for metadata.
 
-Status: v0.2.0 standalone Linux desktop app. See [docs/TEST_REPORT.md](docs/TEST_REPORT.md) for what has been verified on Linux with an NVIDIA GPU.
+Status: v0.3.0 standalone Linux desktop app. Speak still clones a voice with Qwen3-TTS. **Studio** adds voice design, dubbing, dictation, transcription, and audiobook chapters, and can hand a line to a local [VoiceStudio](https://github.com/debpalash/VoiceStudio) engine. See [docs/VOICESTUDIO.md](docs/VOICESTUDIO.md). GPU verification for v0.2.0 is in [docs/TEST_REPORT.md](docs/TEST_REPORT.md).
 
 ## Requirements
 
@@ -76,6 +76,8 @@ offline.
 
 - **Speak** — voice menu, a large text editor (saved automatically, restored after a restart), the Speak button, the
   result with **Save Audio**, and a short **Recent** list.
+- **Studio** — design a voice from a description, dub a recording, dictate, transcribe, or split an audiobook.
+  Optional: point it at VoiceStudio on this computer (`scripts/fetch-voicestudio.sh`, then `scripts/run-voicestudio-api.sh`).
 - **Voices** — your cloned voices: play the sample, use, rename, add a recording, edit the sample, delete.
 - **Settings** (gear) — auto-play, Save Audio format, offline mode, microphone. **Advanced** holds engine selection,
   the engine's own settings, seed, pauses, pronunciation, export details, model management, storage, the system check

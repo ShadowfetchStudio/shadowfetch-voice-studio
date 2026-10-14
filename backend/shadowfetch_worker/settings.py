@@ -38,6 +38,7 @@ class Settings(BaseModel):
     # Speak screen
     speak_project_id: str | None = None  # the hidden scratch project behind Speak (created on first use)
     speak_autoplay: bool = True          # play the result as soon as it is ready
+    voicestudio_url: str = "http://127.0.0.1:3900"  # optional VoiceStudio engine on this computer
     export_loudness_target: str | None = None   # Save Audio: optional named loudness target (audio/export.py)
     extra: dict[str, Any] = Field(default_factory=dict)
 
