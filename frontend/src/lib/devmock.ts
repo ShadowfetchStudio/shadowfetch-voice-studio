@@ -84,6 +84,200 @@ function fail(code: WorkerErrorShape["code"], message: string, details: Record<s
   throw { code, message: `${message} ${MOCK}`, details, recoverable } satisfies WorkerErrorShape;
 }
 
+const VOICESTUDIO_DEFAULT_URL = "http://127.0.0.1:3900";
+
+const STUDIO_WORKSPACES = [
+  { id: "speak", title: "Speak", summary: "Type, pick a cloned voice, and hear it. Qwen3-TTS on this computer.", engine: "shadowfetch" },
+  { id: "design", title: "Design", summary: "Describe a voice in words. Shadowfetch parses the description; VoiceStudio can speak it.", engine: "both" },
+  { id: "dub", title: "Dub", summary: "Transcribe a recording into timed lines, edit them, and send the script to Speak.", engine: "shadowfetch" },
+  { id: "dictate", title: "Dictate", summary: "Record with the microphone and turn it into text with local Whisper.", engine: "shadowfetch" },
+  { id: "transcribe", title: "Transcribe", summary: "Turn an audio file into text without leaving the studio.", engine: "shadowfetch" },
+  { id: "audiobook", title: "Audiobook", summary: "Split a long script into chapters and open each one in Speak.", engine: "shadowfetch" },
+];
+
+/** Same token lists as `shadowfetch_worker.studio.design` so the preview matches the worker. */
+const DESIGN_RULES: Array<[string, Array<[string, string]>]> = [
+  ["gender", [["non-binary", "neutral"], ["nonbinary", "neutral"], ["female", "female"], ["woman", "female"], ["girl", "female"], ["male", "male"], ["man", "male"], ["boy", "male"]]],
+  ["age", [["middle-aged", "middle-aged"], ["middle aged", "middle-aged"], ["elderly", "older"], ["senior", "older"], ["older", "older"], ["teenager", "young"], ["teen", "young"], ["child", "child"], ["young", "young"]]],
+  ["pitch", [["very low", "very-low"], ["very high", "very-high"], ["deep", "low"], ["low", "low"], ["high", "high"], ["soprano", "high"]]],
+  ["pace", [["very slow", "very-slow"], ["very fast", "very-fast"], ["slow", "slow"], ["fast", "fast"], ["quick", "fast"]]],
+  ["tone", [["storyteller", "narrative"], ["narrator", "narrative"], ["whisper", "soft"], ["soft", "soft"], ["warm", "warm"], ["bright", "bright"], ["calm", "calm"], ["serious", "serious"], ["cheerful", "cheerful"]]],
+  ["accent", [["british", "british"], ["english accent", "british"], ["american", "american"], ["australian", "australian"], ["irish", "irish"], ["scottish", "scottish"], ["indian", "indian"]]],
+];
+
+const DESIGN_STOP = new Set(["a", "an", "the", "and", "or", "with", "voice", "sound", "sounds", "like", "of", "to", "for", "who", "that", "is", "slightly", "very", "bit", "little"]);
+
+function mockDescribeVoice(description: string) {
+  const raw = (description || "").trim();
+  const folded = raw.toLowerCase().replace(/\s+/g, " ");
+  const attrs: Record<string, string> = {};
+  for (const [category] of DESIGN_RULES) attrs[category] = "auto";
+  const matched: Array<{ category: string; token: string; phrase: string }> = [];
+  const consumed: Array<[number, number]> = [];
+  for (const [category, rules] of DESIGN_RULES) {
+    let best: [number, string, string] | null = null;
+    for (const [phrase, token] of rules) {
+      const start = folded.indexOf(phrase);
+      if (start < 0) continue;
+      if (best === null || start < best[0] || (start === best[0] && phrase.length > best[1].length)) {
+        best = [start, phrase, token];
+      }
+    }
+    if (!best) continue;
+    const [start, phrase, token] = best;
+    attrs[category] = token;
+    matched.push({ category, token, phrase });
+    consumed.push([start, start + phrase.length]);
+  }
+  const mask = Array.from(folded, () => false);
+  for (const [start, end] of consumed) {
+    for (let i = start; i < Math.min(end, mask.length); i++) mask[i] = true;
+  }
+  const leftover = Array.from(folded, (ch, i) => (mask[i] ? " " : ch)).join("");
+  const unmatched: string[] = [];
+  for (const word of leftover.match(/[a-z][a-z'-]{2,}/g) ?? []) {
+    if (DESIGN_STOP.has(word) || unmatched.includes(word)) continue;
+    unmatched.push(word);
+  }
+  return { description: raw, attrs, instruct: matched.map((item) => item.token).join(", "), matched, unmatched };
+}
+
+const CHAPTER_HEADING = /^(?:#{1,3}\s+|(?:chapter|part)\s+\d+\b[^\n]*)/gim;
+
+function mockPackChapter(body: string, limit: number): string[] {
+  const paragraphs = body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  if (!paragraphs.length && body.trim()) paragraphs.push(body.trim());
+  const parts: string[] = [];
+  let current = "";
+  for (const paragraph of paragraphs) {
+    if (paragraph.length > limit) {
+      if (current) {
+        parts.push(current);
+        current = "";
+      }
+      for (let start = 0; start < paragraph.length; start += limit) {
+        const slice = paragraph.slice(start, start + limit).trim();
+        if (slice) parts.push(slice);
+      }
+      continue;
+    }
+    const candidate = current ? `${current}\n\n${paragraph}` : paragraph;
+    if (candidate.length <= limit) current = candidate;
+    else {
+      parts.push(current);
+      current = paragraph;
+    }
+  }
+  if (current) parts.push(current);
+  return parts.filter(Boolean);
+}
+
+function mockSplitChapters(text: string, maxChars = 4000) {
+  const raw = (text || "").replace(/\r\n/g, "\n").trim();
+  if (!raw) return [];
+  const limit = Math.max(200, Math.floor(Number(maxChars) || 4000));
+  CHAPTER_HEADING.lastIndex = 0;
+  const matches = [...raw.matchAll(CHAPTER_HEADING)];
+  const blocks: Array<[string, string]> = [];
+  if (!matches.length) blocks.push(["Chapter 1", raw]);
+  else {
+    if ((matches[0]?.index ?? 0) > 0) {
+      const preface = raw.slice(0, matches[0]!.index).trim();
+      if (preface) blocks.push(["Opening", preface]);
+    }
+    matches.forEach((match, i) => {
+      const title = match[0].replace(/^#+\s*/, "").trim() || `Chapter ${i + 1}`;
+      const end = i + 1 < matches.length ? matches[i + 1]!.index! : raw.length;
+      const body = raw.slice(match.index! + match[0].length, end).trim();
+      blocks.push([title, body || title]);
+    });
+  }
+  const chapters: Array<{ index: number; title: string; text: string; chars: number }> = [];
+  for (const [title, body] of blocks) {
+    const pieces = mockPackChapter(body, limit);
+    pieces.forEach((piece, i) => {
+      const label = pieces.length === 1 ? title : `${title} · part ${i + 1}`;
+      chapters.push({ index: chapters.length, title: label, text: piece, chars: piece.length });
+    });
+  }
+  return chapters;
+}
+
+function mockSeconds(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) return null;
+  return Math.round(number * 1000) / 1000;
+}
+
+function mockCuesFromSegments(segments: unknown) {
+  const cues: Array<{ index: number; start_s: number | null; end_s: number | null; duration_s: number | null; text: string; gap_after_s: number | null }> = [];
+  for (const raw of Array.isArray(segments) ? segments : []) {
+    const row = (raw ?? {}) as Record<string, unknown>;
+    const text = String(row.text ?? "").trim();
+    if (!text) continue;
+    const start = mockSeconds(row.start ?? row.start_s);
+    const end = mockSeconds(row.end ?? row.end_s);
+    const duration = start != null && end != null && end >= start ? Math.round((end - start) * 1000) / 1000 : null;
+    cues.push({ index: cues.length, start_s: start, end_s: end, duration_s: duration, text, gap_after_s: null });
+  }
+  cues.forEach((cue, i) => {
+    const nxt = cues[i + 1];
+    cue.gap_after_s = cue.end_s == null || nxt?.start_s == null ? null : Math.round(Math.max(0, nxt.start_s - cue.end_s) * 1000) / 1000;
+  });
+  return cues;
+}
+
+function mockScriptFromCues(cues: unknown): string {
+  const lines = (Array.isArray(cues) ? cues : []).map((c) => String((c as { text?: unknown })?.text ?? "").trim()).filter(Boolean);
+  return lines.join("\n\n");
+}
+
+function mockStudioBundle() {
+  return {
+    bundled: false,
+    root: null,
+    default_url: VOICESTUDIO_DEFAULT_URL,
+    license: "AGPL-3.0-only",
+    upstream: "https://github.com/debpalash/VoiceStudio",
+  };
+}
+
+function mockIsLoopback(host: string): boolean {
+  const name = host.toLowerCase().replace(/^\[|\]$/g, "");
+  if (name === "localhost" || name === "::1") return true;
+  const parts = name.split(".");
+  if (parts.length === 4 && parts.every((p) => /^\d+$/.test(p))) {
+    const n = parts.map(Number);
+    return n[0] === 127 && n.every((x) => x >= 0 && x <= 255);
+  }
+  return false;
+}
+
+function mockVoiceStudioUrl(url: unknown, offline: boolean): string {
+  const raw = String(url || VOICESTUDIO_DEFAULT_URL).trim();
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    fail("INVALID_PARAMS", "VoiceStudio URL must start with http:// or https://", { url: raw });
+  }
+  if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || !parsed.hostname) {
+    fail("INVALID_PARAMS", "VoiceStudio URL must start with http:// or https://", { url: raw });
+  }
+  if (parsed.username || parsed.password) {
+    fail("INVALID_PARAMS", "Put a VoiceStudio API key in the request, not in the URL", { url: raw });
+  }
+  const loopback = mockIsLoopback(parsed.hostname);
+  if (parsed.protocol === "http:" && !loopback) {
+    fail("PERMISSION_DENIED", "VoiceStudio over plain HTTP is only allowed on this computer. Use https:// for a remote engine.", { url: raw }, false);
+  }
+  if (offline && !loopback) {
+    fail("OFFLINE_BLOCKED", "Offline mode blocks a remote VoiceStudio engine. Use the engine on this computer, or turn offline mode off.", { url: raw });
+  }
+  return raw.replace(/\/+$/, "");
+}
+
 const defaultSettings: Settings = {
   offline: false,
   models_dir: "",
@@ -109,6 +303,7 @@ const defaultSettings: Settings = {
   onboarding_done: false,
   rights_notice_accepted: false,
   engine_settings: {},
+  voicestudio_url: VOICESTUDIO_DEFAULT_URL,
   extra: {},
 };
 
@@ -206,7 +401,7 @@ function initialState(): MockState {
     cancelled: new Set(),
     recording: null,
     speak: { projectId: "proj_speak_mock", text: "", voiceId: voices[0]?.id ?? null, settings: {}, history: [], lastText: "" },
-    settings: { ...defaultSettings, speak_autoplay: true, speak_project_id: "proj_speak_mock", onboarding_done: !fresh },
+    settings: { ...defaultSettings, speak_autoplay: true, speak_project_id: "proj_speak_mock", voicestudio_url: VOICESTUDIO_DEFAULT_URL, onboarding_done: !fresh },
     status: { running: true, restarts: 0, last_error: null, stopped: false },
     downloads: new Map(),
     engines: [
@@ -616,6 +811,55 @@ export function createMockTransport(): Transport {
         return { targets: [{ id: "podcast-16", label: "Podcast (-16 LUFS, -1 dBTP)", integrated_lufs: -16, true_peak_dbtp: -1, lra: 11, description: "mock" }, { id: "streaming-14", label: "Streaming (-14 LUFS, -1 dBTP)", integrated_lufs: -14, true_peak_dbtp: -1, lra: 11, description: "mock" }] };
       case "record.scripts":
         return { scripts: [{ id: "rainbow", title: "The Rainbow Passage", style: "neutral", text: "When the sunlight strikes raindrops in the air, they act as a prism and form a rainbow. The rainbow is a division of white light into many beautiful colors. These take the shape of a long round arch, with its path high above, and its two ends apparently beyond the horizon.", approx_seconds: 25 }, { id: "news", title: "News read", style: "news", text: "Good evening. Here are tonight's top stories: local volunteers opened a new community garden, and forecasters expect clear skies for the weekend.", approx_seconds: 15 }] };
+
+      // ---------------------------------------------------------------- studio (mirrors shadowfetch_worker.jobs.studio)
+      case "studio.catalog":
+        return {
+          app: "Shadowfetch Voice Studio",
+          version: `0.3.0 ${MOCK}`,
+          workspaces: STUDIO_WORKSPACES.map((w) => ({ ...w })),
+          voicestudio_url: state.settings.voicestudio_url ?? VOICESTUDIO_DEFAULT_URL,
+          voicestudio: mockStudioBundle(),
+        };
+      case "studio.design":
+        return mockDescribeVoice(String(params.description ?? ""));
+      case "studio.chapters": {
+        const chapters = mockSplitChapters(String(params.text ?? ""), typeof params.max_chars === "number" ? params.max_chars : 4000);
+        return { chapters, count: chapters.length };
+      }
+      case "studio.dub_cues": {
+        const cues = mockCuesFromSegments(params.segments);
+        return { cues, count: cues.length, script: mockScriptFromCues(cues) };
+      }
+      case "studio.script": {
+        const script = mockScriptFromCues(params.cues);
+        return { script, chars: script.length };
+      }
+      case "studio.voicestudio.status": {
+        const url = mockVoiceStudioUrl(params.url ?? state.settings.voicestudio_url, state.settings.offline);
+        return {
+          url,
+          reachable: false,
+          starting: false,
+          status: "offline",
+          version: null,
+          device: null,
+          protocol: null,
+          message: `VoiceStudio is not running at that address. ${MOCK}`,
+          bundle: mockStudioBundle(),
+        };
+      }
+      case "studio.voicestudio.speak": {
+        const url = mockVoiceStudioUrl(params.url ?? state.settings.voicestudio_url, state.settings.offline);
+        const text = String(params.text ?? "").trim();
+        if (!text) fail("INVALID_PARAMS", "Enter the line you want VoiceStudio to speak.");
+        if (text.length > 4096) fail("INVALID_PARAMS", "VoiceStudio accepts up to 4096 characters in one request.", { chars: text.length });
+        progress(id, { stage: "voicestudio", message: "Asking VoiceStudio to speak" });
+        await delay(400);
+        const seconds = Math.max(1.5, Math.min(20, text.length / 15));
+        const path = mockWav(seconds, 9);
+        return { path, bytes: Math.round(seconds * 8000), content_type: "audio/wav", url, elapsed_s: 0.4 };
+      }
       default:
         fail("NOT_FOUND", `Method ${method} is not implemented by the preview mock`, { method }, false);
     }

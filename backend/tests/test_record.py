@@ -162,7 +162,11 @@ def test_incremental_growth_levels_and_stop(paths: AppPaths):
         assert abs(lv["rms_dbfs"] - dbfs(0.5 / math.sqrt(2))) < 0.5, lv
         assert lv["clipped"] is False and lv["clip_count_total"] == 0 and lv["overflows"] == 0
         assert lv["session_id"] == s.session_id and lv["bytes_written"] >= 0
-    assert levels[-1]["elapsed_s"] > 0 and levels[-1]["bytes_written"] == s.frames_written * 3
+    # The 10 Hz meter snapshot can lag the writer by a few blocks while capture is still running.
+    assert levels[-1]["elapsed_s"] > 0
+    assert levels[-1]["bytes_written"] > 0
+    assert levels[-1]["bytes_written"] % 3 == 0
+    assert levels[-1]["bytes_written"] <= s.frames_written * 3
 
     res = s.stop()
     assert res["session_id"] == s.session_id and res["error"] is None and res["state"] == "stopped"

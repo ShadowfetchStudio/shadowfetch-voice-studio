@@ -450,16 +450,6 @@ export const api = {
     loudnessTargets: (o?: Opts) => request("export.loudness_targets", none, o),
   },
 
-  studio: {
-    catalog: (o?: Opts) => request("studio.catalog", none, o),
-    design: (description: string, o?: Opts) => request("studio.design", { description }, o),
-    chapters: (p: ParamsOf<"studio.chapters">, o?: Opts) => request("studio.chapters", p, o),
-    dubCues: (segments: ParamsOf<"studio.dub_cues">["segments"], o?: Opts) => request("studio.dub_cues", { segments }, o),
-    script: (cues: ParamsOf<"studio.script">["cues"], o?: Opts) => request("studio.script", { cues }, o),
-    voiceStudioStatus: (url?: string, o?: Opts) => request("studio.voicestudio.status", url ? { url } : {}, o),
-    voiceStudioSpeak: (p: ParamsOf<"studio.voicestudio.speak">, o?: Opts) => request("studio.voicestudio.speak", p, o),
-  },
-
   models: {
     list: (o?: Opts) => request("models.list", none, o),
     state: (model_id: string, o?: Opts) => request("models.state", { model_id }, o),

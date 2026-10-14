@@ -33,7 +33,7 @@ describe("Studio workspace", () => {
     expect(screen.getByLabelText("Describe the voice")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Read description" }));
-    expect(await screen.findByText(/female, warm, british/)).toBeInTheDocument();
+    expect(await screen.findByText(/female, older, warm, british/)).toBeInTheDocument();
     expect(screen.getByText(/Not used: raspy/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Audiobook" }));

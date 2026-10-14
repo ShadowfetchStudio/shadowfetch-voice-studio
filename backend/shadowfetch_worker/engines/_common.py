@@ -111,10 +111,13 @@ def apply_seed(seed: int | None) -> int:
     if seed is None:
         seed = random.SystemRandom().randint(0, 2**31 - 1)
     seed = int(seed) & 0xFFFFFFFF
-    import torch
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
+    try:
+        import torch
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+    except ImportError:
+        pass
     random.seed(seed)
     try:
         import numpy as np
