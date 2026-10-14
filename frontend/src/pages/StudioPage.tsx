@@ -1,12 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { AudioLines, BookOpen, Captions, Clapperboard, Mic, PenLine, Radio } from "lucide-react";
 import { api } from "@/lib/api";
+import { studioApi } from "@/lib/studioClient";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Field";
 import { Tabs } from "@/components/ui/Tabs";
 import { handleError, useAppStore } from "@/store/appStore";
 import { useSpeakStore } from "@/features/speak/speakStore";
-import type { SettingsPatch } from "@/lib/protocol";
 import type { StudioCatalog, StudioChapter, StudioDesign, StudioDubCue, StudioVoiceStudioStatus } from "@/lib/studioProtocol";
 
 type StudioTab = "design" | "dub" | "dictate" | "transcribe" | "audiobook" | "engine";
@@ -27,7 +27,7 @@ export default function StudioPage() {
   const [catalog, setCatalog] = useState<StudioCatalog | null>(null);
 
   useEffect(() => {
-    const req = api.studio.catalog();
+    const req = studioApi.catalog();
     void req.then(setCatalog).catch((err) => handleError(err, "Couldn't open Studio"));
     return () => {
       void req.cancel();
@@ -76,7 +76,7 @@ function DesignPanel() {
   const parse = async () => {
     setBusy("design");
     try {
-      setDesign(await api.studio.design(description));
+      setDesign(await studioApi.design(description));
     } catch (err) {
       handleError(err, "Couldn't read that description");
     } finally {
@@ -88,7 +88,7 @@ function DesignPanel() {
     setBusy("speak");
     setAudio(null);
     try {
-      const result = await api.studio.voiceStudioSpeak({ text: line, instruct: design?.instruct || undefined });
+      const result = await studioApi.voiceStudioSpeak({ text: line, instruct: design?.instruct || undefined });
       setAudio(result.path.startsWith("data:") || result.path.startsWith("http") ? result.path : await api.shell.mediaSrc(result.path));
     } catch (err) {
       handleError(err, "VoiceStudio didn't speak");
@@ -141,7 +141,7 @@ function DubPanel({ onSpeak }: { onSpeak: (page: "speak") => void }) {
       const segments = transcript.segments.length
         ? transcript.segments
         : [{ text: transcript.text }];
-      const sheet = await api.studio.dubCues(segments);
+      const sheet = await studioApi.dubCues(segments);
       setCues(sheet.cues);
       setNote(transcript.text);
     } catch (err) {
@@ -259,7 +259,7 @@ function AudiobookPanel({ onSpeak }: { onSpeak: (page: "speak") => void }) {
   const split = async () => {
     setBusy(true);
     try {
-      const result = await api.studio.chapters({ text });
+      const result = await studioApi.chapters({ text });
       setChapters(result.chapters);
     } catch (err) {
       handleError(err, "Couldn't split that script");
@@ -313,8 +313,8 @@ function EnginePanel({ initialUrl }: { initialUrl?: string }) {
   const check = async () => {
     setBusy(true);
     try {
-      await api.system.settingsSet({ voicestudio_url: url } as SettingsPatch);
-      setStatus(await api.studio.voiceStudioStatus(url));
+      await api.requestRaw("system.settings.set", { patch: { voicestudio_url: url } });
+      setStatus(await studioApi.voiceStudioStatus(url));
     } catch (err) {
       handleError(err, "Couldn't reach VoiceStudio");
     } finally {
