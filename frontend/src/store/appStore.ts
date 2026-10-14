@@ -16,10 +16,10 @@ import { friendlyError, logWorkerError } from "@/lib/friendlyErrors";
 import { toast, useToastStore } from "@/components/ui/Toast";
 
 /**
- * Pages. The app is built around two: Speak (the default) and Voices; Settings sits behind the gear.
+ * Pages. Speak, Studio, and Voices are the main places; Settings sits behind the gear.
  * "setup" (system check), "projects" and "editor" (multi-take project editor) are advanced tools reached from Settings.
  */
-export type Page = "speak" | "voices" | "settings" | "setup" | "projects" | "editor";
+export type Page = "speak" | "studio" | "voices" | "settings" | "setup" | "projects" | "editor";
 
 /** Optional parameters for a page (e.g. open a project in the editor, scroll Settings to a section). */
 export interface RouteParams {
