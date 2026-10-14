@@ -164,6 +164,17 @@ The UI renders **only** what appears here.
 - `models.remove` `{model_id, confirm:true}` → `{ok, deleted, freed_bytes}` (only the managed cache directory; a custom directory is merely unlinked)
 - `models.state` `{model_id}` → one entry of `models.list`; `engine.health {engine_id}`; `transcribe.unload` → `{ok}` (extra methods beyond the original draft)
 
+### studio
+Merged workspaces. Voice design, chapter splits, and dub cue sheets run inside this worker. Speech generation through VoiceStudio is an HTTP call to a separate AGPL-3.0 process; this worker does not import that code.
+
+- `studio.catalog` → `{app, version, workspaces:[{id,title,summary,engine}], voicestudio_url, voicestudio:{bundled, root, default_url, license, upstream}}`
+- `studio.design` `{description}` → `{description, attrs, instruct, matched:[{category,token,phrase}], unmatched:[str]}`
+- `studio.chapters` `{text, max_chars?:4000}` → `{chapters:[{index,title,text,chars}], count}`
+- `studio.dub_cues` `{segments:[{start?,end?,text?}]}` → `{cues:[{index,start_s,end_s,duration_s,text,gap_after_s}], count, script}`
+- `studio.script` `{cues:[{text?}]}` → `{script, chars}`
+- `studio.voicestudio.status` `{url?}` → `{url, reachable, starting, status, version?, device?, protocol?, message, bundle}` (a down server is a result, not an error; a non-loopback `http://` URL is `PERMISSION_DENIED`)
+- `studio.voicestudio.speak` `{text, url?, voice?, instruct?, model?}` → `{path, bytes, content_type, url, elapsed_s}` (`ENGINE_UNAVAILABLE` when the engine does not return audio)
+
 ## Engine host protocol
 Same envelope; methods `engine.caps`, `engine.load {model_dir, device, dtype}`, `engine.unload`, `engine.prepare {reference_path, transcript?, language?, cache_path, settings?}` (`settings` = the engine's `prompt_controls`, e.g. Chatterbox `norm_loudness`, Qwen `x_vector_only_mode` — they are part of the prompt-cache identity), `engine.generate {text, language, reference_path?, prompt_cache_path?, transcript?, settings, seed, out_path}` (at least one of `prompt_cache_path` / `reference_path` must be usable — the adapter falls back to `reference_path` when the cache is missing, unreadable or was built with different prompt settings, and raises `INVALID_PARAMS` when neither works), `engine.health`. Hosts are started with
 `<env python> -m shadowfetch_worker.engine_host --engine <id>` and inherit `HF_HUB_OFFLINE`/`TRANSFORMERS_OFFLINE` from the main worker's offline setting.
