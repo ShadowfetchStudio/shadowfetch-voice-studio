@@ -5,7 +5,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="${SFVS_VOICESTUDIO_ROOT:-$ROOT/third_party/VoiceStudio}"
-PORT="${OMNIVOICE_PORT:-3900}"
+# 3900 is the Studio page (scripts/serve-studio.sh). This API uses the next port.
+PORT="${OMNIVOICE_PORT:-3901}"
 
 if [[ ! -f "$DEST/backend/main.py" ]]; then
   echo "VoiceStudio is not checked out. Run scripts/fetch-voicestudio.sh first." >&2

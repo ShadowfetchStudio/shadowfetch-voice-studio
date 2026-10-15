@@ -15,4 +15,5 @@ else
 fi
 
 echo "VoiceStudio is at $DEST"
-echo "Start its API with: scripts/run-voicestudio-api.sh"
+echo "Open the Studio page with: scripts/serve-studio.sh  (http://127.0.0.1:3900/)"
+echo "Start the VoiceStudio speech API with: scripts/run-voicestudio-api.sh  (http://127.0.0.1:3901/)"
