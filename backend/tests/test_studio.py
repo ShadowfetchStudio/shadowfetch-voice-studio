@@ -118,6 +118,59 @@ def test_status_reports_a_missing_engine():
     assert "not running" in probed["message"]
 
 
+def test_studio_page_serves_html_and_does_not_redirect():
+    from urllib import request as urlrequest
+
+    from shadowfetch_worker.studio.serve import make_server
+
+    server = make_server("127.0.0.1", 0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        class NoRedirect(urlrequest.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                raise AssertionError(f"unexpected redirect to {newurl}")
+
+        opener = urlrequest.build_opener(NoRedirect)
+        with opener.open(base + "/", timeout=3) as response:
+            page = response.read().decode("utf-8")
+            assert response.status == 200
+            assert "text/html" in response.headers.get("Content-Type", "")
+        assert "<h1>Shadowfetch Voice Studio</h1>" in page
+        assert "http-equiv=\"refresh\"" not in page
+
+        with opener.open(base + "/health", timeout=3) as response:
+            health = json.loads(response.read().decode("utf-8"))
+        assert health["status"] == "ok"
+        assert health["app"] == "Shadowfetch Voice Studio"
+        assert health["voicestudio"] == "offline"
+
+        design = json.dumps({"description": "a warm elderly British woman"}).encode()
+        req = urlrequest.Request(base + "/studio/design", data=design, headers={"Content-Type": "application/json"})
+        with opener.open(req, timeout=3) as response:
+            designed = json.loads(response.read().decode("utf-8"))
+        assert designed["attrs"]["gender"] == "female"
+
+        probed = status(base)
+        assert probed["reachable"] is False
+        assert "Studio is open in the browser" in probed["message"]
+
+        speech = urlrequest.Request(
+            base + "/v1/audio/speech",
+            data=json.dumps({"input": "Hello"}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            opener.open(speech, timeout=3)
+            raise AssertionError("speech should fail while the engine is down")
+        except urlrequest.HTTPError as exc:
+            assert exc.code == 503
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
+
+
 def test_studio_methods_are_registered(app):
     import shadowfetch_worker.jobs.studio  # noqa: F401
     from shadowfetch_worker.rpc import registry
