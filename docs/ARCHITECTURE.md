@@ -41,8 +41,10 @@
   touches is inside the app data dir or was picked by the user through a native dialog and re-validated.
 
 ## Simple on top, sophisticated underneath
-The UI has two places — **Speak** and **Voices** — plus Settings behind a gear. Everything the old workstation UI asked
-the user to do by hand now happens underneath, through the same methods:
+The UI has three places — **Speak**, **Studio**, and **Voices** — plus Settings behind a gear. `scripts/serve-studio.sh`
+also serves a loopback HTML page at `http://127.0.0.1:3900/` for design and chapter splitting, and forwards
+`POST /v1/audio/speech` to VoiceStudio on `127.0.0.1:3901` when that process is running. Everything the old workstation
+UI asked the user to do by hand now happens underneath, through the same methods:
 
 | The user does | Underneath |
 |---------------|------------|

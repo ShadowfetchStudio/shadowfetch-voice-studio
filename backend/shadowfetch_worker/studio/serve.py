@@ -248,7 +248,8 @@ class StudioHandler(BaseHTTPRequestHandler):
             except (TypeError, ValueError):
                 self._json(400, {"error": "max_chars must be a number."})
                 return
-            self._json(200, {"chapters": split_chapters(str(payload.get("text") or ""), limit)})
+            chapters = split_chapters(str(payload.get("text") or ""), limit)
+            self._json(200, {"chapters": chapters, "count": len(chapters)})
             return
         self._json(404, {"error": "Not found"})
 
@@ -267,13 +268,18 @@ class StudioHandler(BaseHTTPRequestHandler):
         self._send(code, json.dumps(payload).encode("utf-8"), "application/json; charset=utf-8")
 
     def _send(self, code: int, body: bytes, content_type: str) -> None:
+        self.close_connection = True
         self.send_response(code)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Connection", "close")
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except OSError:
+            return
 
     def log_message(self, fmt: str, *args) -> None:
         return
@@ -299,7 +305,7 @@ def _proxy_speech(body: bytes, content_type: str) -> tuple[int, bytes, str]:
     except error.HTTPError as exc:
         payload = exc.read(65_536)
         return exc.code, payload, exc.headers.get("Content-Type", "application/json")
-    except error.URLError:
+    except (error.URLError, TimeoutError, OSError):
         message = {"error": "VoiceStudio's speech engine stopped answering."}
         return 503, json.dumps(message).encode("utf-8"), "application/json; charset=utf-8"
 
@@ -312,7 +318,12 @@ def make_server(host: str = HOST, port: int | None = None) -> ThreadingHTTPServe
     if port is None:
         env = os.environ.get("SFVS_STUDIO_PORT", "").strip()
         if env:
-            chosen = int(env)
+            try:
+                chosen = int(env)
+            except ValueError as exc:
+                raise ValueError("SFVS_STUDIO_PORT must be a number.") from exc
+    if chosen < 0 or chosen > 65535:
+        raise ValueError("The Studio page port must be between 0 and 65535.")
     server = ThreadingHTTPServer((host, chosen), StudioHandler)
     server.daemon_threads = True
     return server

@@ -325,8 +325,11 @@ function EnginePanel({ initialUrl }: { initialUrl?: string }) {
   return (
     <section aria-labelledby="studio-tab-engine" className="flex flex-col gap-4 max-w-[760px]">
       <p className="text-sm text-muted">
-        VoiceStudio stays its own program, under the AGPL-3.0. Shadowfetch talks to it on this computer at the address
-        below. Clone it with <code>scripts/fetch-voicestudio.sh</code>, then start the API with <code>scripts/run-voicestudio-api.sh</code>.
+        VoiceStudio stays its own program, under the AGPL-3.0. The Studio page at{" "}
+        <code>http://127.0.0.1:3900/</code> (<code>scripts/serve-studio.sh</code>) is this app; it forwards speech to
+        VoiceStudio on <code>127.0.0.1:3901</code>. Clone it with <code>scripts/fetch-voicestudio.sh</code>, start the
+        page, then start the engine with <code>scripts/run-voicestudio-api.sh</code>. You can also point this field at
+        port 3901 directly.
       </p>
       <label className="flex flex-col gap-1.5 text-[13px] font-medium">
         VoiceStudio address
