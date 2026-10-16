@@ -61,6 +61,7 @@ Flags: `--skip-build` to reuse an existing `.deb`; `--with-chatterbox` to includ
 
 ```bash
 scripts/dev.sh             # desktop app in development mode
+scripts/serve-studio.sh    # Studio page at http://127.0.0.1:3900/
 scripts/test.sh            # unit tests (add --real for GPU/model integration tests)
 scripts/build.sh --deb-only  # supported Linux package
 scripts/build.sh             # also tries an AppImage (best-effort)
@@ -78,6 +79,8 @@ offline.
   result with **Save Audio**, and a short **Recent** list.
 - **Studio** — design a voice from a description, dub a recording, dictate, transcribe, or split an audiobook.
   Optional: point it at VoiceStudio on this computer (`scripts/fetch-voicestudio.sh`, then `scripts/run-voicestudio-api.sh`).
+  A browser page at http://127.0.0.1:3900/ (`scripts/serve-studio.sh`) serves Design and chapter splitting; speech is
+  forwarded to VoiceStudio on `127.0.0.1:3901` when that process is running.
 - **Voices** — your cloned voices: play the sample, use, rename, add a recording, edit the sample, delete.
 - **Settings** (gear) — auto-play, Save Audio format, offline mode, microphone. **Advanced** holds engine selection,
   the engine's own settings, seed, pauses, pronunciation, export details, model management, storage, the system check
@@ -100,7 +103,9 @@ Local storage is **not** encrypted. Treat the data directory like any other priv
 
 ## Documentation
 
-- [docs/USER_GUIDE.md](docs/USER_GUIDE.md) — Speak, Clone Voice, Voices, Settings
+- [docs/USER_GUIDE.md](docs/USER_GUIDE.md) — Speak, Studio, Clone Voice, Voices, Settings
+- [docs/VOICESTUDIO.md](docs/VOICESTUDIO.md) — optional VoiceStudio engine and the Studio page on port 3900
+- [docs/RELEASE_NOTES_0.3.0.md](docs/RELEASE_NOTES_0.3.0.md) — v0.3.0
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — process layout and data model
 - [docs/PROTOCOL.md](docs/PROTOCOL.md) — JSON-lines worker protocol
 - [docs/MODEL_LICENSES.md](docs/MODEL_LICENSES.md) — engine and model licenses

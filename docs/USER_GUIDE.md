@@ -46,6 +46,19 @@ used. When no clean part can be found automatically, the sample editor opens so 
 (the voice is cloned from the audio *and* these exact words), and optionally clean the sample up (even out the volume,
 trim silence, remove rumble — always applied to a copy).
 
+## Studio
+
+**Studio** is for the longer jobs beside Speak:
+
+- **Design** — describe a voice in plain language. Shadowfetch maps the words locally (no model download). If VoiceStudio is running, **Speak with VoiceStudio** sends a sample line to that engine.
+- **Dub** — transcribe a recording into timed lines, edit them, and open the script in Speak.
+- **Dictate** — record with the microphone and turn it into text with local Whisper.
+- **Transcribe** — turn an audio file into text without leaving Studio.
+- **Audiobook** — split a script on Chapter, Part, or Markdown headings, then open a chapter in Speak.
+- **VoiceStudio** — optional separate AGPL-3.0 engine on this computer. See `docs/VOICESTUDIO.md`.
+
+A browser page at **http://127.0.0.1:3900/** (`scripts/serve-studio.sh`) offers Design and chapter splitting on this computer. It is this app, not a redirect. Speech still needs VoiceStudio on `127.0.0.1:3901` (`scripts/run-voicestudio-api.sh`); the page forwards `POST /v1/audio/speech` only to that loopback process.
+
 ## Voices
 
 Your voices with their sample length and date. **Play Sample** plays the part the voice is cloned from; **Use Voice**

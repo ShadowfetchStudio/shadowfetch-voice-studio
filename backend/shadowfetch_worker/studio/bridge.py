@@ -77,7 +77,11 @@ def status(url: str, *, offline: bool = False, timeout: float = 3.0) -> dict:
     reachable = bool(health["ok"] and isinstance(health["body"], dict) and health["body"].get("status") == "ok")
     starting = bool(health["status"] == 503 and isinstance(health["body"], dict) and health["body"].get("status") == "starting")
     body = health["body"] if isinstance(health["body"], dict) else {}
-    if reachable:
+    studio_page = body.get("app") == "Shadowfetch Voice Studio" and body.get("voicestudio") != "ok"
+    if studio_page:
+        reachable = False
+        message = "Studio is open in the browser at this address. VoiceStudio's speech engine is not running yet."
+    elif reachable:
         message = "VoiceStudio is ready on this computer."
     elif starting:
         message = body.get("label") or "VoiceStudio is still starting."

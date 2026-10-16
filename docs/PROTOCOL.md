@@ -172,8 +172,18 @@ Merged workspaces. Voice design, chapter splits, and dub cue sheets run inside t
 - `studio.chapters` `{text, max_chars?:4000}` → `{chapters:[{index,title,text,chars}], count}`
 - `studio.dub_cues` `{segments:[{start?,end?,text?}]}` → `{cues:[{index,start_s,end_s,duration_s,text,gap_after_s}], count, script}`
 - `studio.script` `{cues:[{text?}]}` → `{script, chars}`
-- `studio.voicestudio.status` `{url?}` → `{url, reachable, starting, status, version?, device?, protocol?, message, bundle}` (a down server is a result, not an error; a non-loopback `http://` URL is `PERMISSION_DENIED`)
+- `studio.voicestudio.status` `{url?}` → `{url, reachable, starting, status, version?, device?, protocol?, message, bundle}` (a down server is a result, not an error; a non-loopback `http://` URL is `PERMISSION_DENIED`; if the URL is the Studio page on port 3900 and VoiceStudio is not running, `reachable` is false)
 - `studio.voicestudio.speak` `{text, url?, voice?, instruct?, model?}` → `{path, bytes, content_type, url, elapsed_s}` (`ENGINE_UNAVAILABLE` when the engine does not return audio)
+
+### Studio page (`scripts/serve-studio.sh`, loopback only)
+`python -m shadowfetch_worker.studio.serve` binds `127.0.0.1:3900` (or `SFVS_STUDIO_PORT`). `GET /` is HTML and does not redirect. VoiceStudio, when started with `scripts/run-voicestudio-api.sh`, listens on `127.0.0.1:3901`; the page forwards speech only to that loopback upstream (`SFVS_VOICESTUDIO_UPSTREAM`).
+
+- `GET /` → `text/html` (Studio page)
+- `GET /health` → `{status, version, device, app, voicestudio}` (`voicestudio` is `"ok"` or `"offline"`)
+- `GET /.well-known/voicestudio-speech` → `{protocol: "shadowfetch.studio.v1", app, speech, upstream}`
+- `POST /studio/design` `{description}` → same body as `studio.design`
+- `POST /studio/chapters` `{text, max_chars?}` → `{chapters, count}`
+- `POST /v1/audio/speech` → proxied to VoiceStudio, or `503` while the engine is down
 
 ## Engine host protocol
 Same envelope; methods `engine.caps`, `engine.load {model_dir, device, dtype}`, `engine.unload`, `engine.prepare {reference_path, transcript?, language?, cache_path, settings?}` (`settings` = the engine's `prompt_controls`, e.g. Chatterbox `norm_loudness`, Qwen `x_vector_only_mode` — they are part of the prompt-cache identity), `engine.generate {text, language, reference_path?, prompt_cache_path?, transcript?, settings, seed, out_path}` (at least one of `prompt_cache_path` / `reference_path` must be usable — the adapter falls back to `reference_path` when the cache is missing, unreadable or was built with different prompt settings, and raises `INVALID_PARAMS` when neither works), `engine.health`. Hosts are started with

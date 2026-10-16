@@ -118,6 +118,143 @@ def test_status_reports_a_missing_engine():
     assert "not running" in probed["message"]
 
 
+def test_studio_page_serves_html_and_does_not_redirect():
+    from urllib import request as urlrequest
+
+    from shadowfetch_worker.studio.serve import make_server
+
+    with pytest.raises(ValueError, match="this computer only"):
+        make_server("0.0.0.0", 0)
+
+    server = make_server("127.0.0.1", 0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        class NoRedirect(urlrequest.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                raise AssertionError(f"unexpected redirect to {newurl}")
+
+        opener = urlrequest.build_opener(NoRedirect)
+        with opener.open(base + "/", timeout=3) as response:
+            page = response.read().decode("utf-8")
+            assert response.status == 200
+            assert "text/html" in response.headers.get("Content-Type", "")
+            assert response.geturl() == base + "/"
+            assert not response.headers.get("Location")
+        assert "<h1>Shadowfetch Voice Studio</h1>" in page
+        assert "http-equiv=\"refresh\"" not in page
+
+        with opener.open(base + "/health", timeout=3) as response:
+            health = json.loads(response.read().decode("utf-8"))
+        assert health["status"] == "ok"
+        assert health["app"] == "Shadowfetch Voice Studio"
+        assert health["voicestudio"] == "offline"
+
+        with opener.open(base + "/favicon.ico", timeout=3) as response:
+            assert response.status == 204
+
+        with opener.open(base + "/.well-known/voicestudio-speech", timeout=3) as response:
+            caps = json.loads(response.read().decode("utf-8"))
+        assert caps["protocol"] == "shadowfetch.studio.v1"
+        assert caps["speech"] == "offline"
+
+        design = json.dumps({"description": "a warm elderly British woman"}).encode()
+        req = urlrequest.Request(base + "/studio/design", data=design, headers={"Content-Type": "application/json"})
+        with opener.open(req, timeout=3) as response:
+            designed = json.loads(response.read().decode("utf-8"))
+        assert designed["attrs"]["gender"] == "female"
+
+        chapters = json.dumps({"text": "Chapter 1\n\nOnce there was a road.\n\nChapter 2\n\nThen it ended."}).encode()
+        req = urlrequest.Request(base + "/studio/chapters", data=chapters, headers={"Content-Type": "application/json"})
+        with opener.open(req, timeout=3) as response:
+            split = json.loads(response.read().decode("utf-8"))
+        assert split["count"] == 2
+        assert [c["title"] for c in split["chapters"]] == ["Chapter 1", "Chapter 2"]
+
+        probed = status(base)
+        assert probed["reachable"] is False
+        assert "Studio is open in the browser" in probed["message"]
+
+        speech = urlrequest.Request(
+            base + "/v1/audio/speech",
+            data=json.dumps({"input": "Hello"}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            opener.open(speech, timeout=3)
+            raise AssertionError("speech should fail while the engine is down")
+        except urlrequest.HTTPError as exc:
+            assert exc.code == 503
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
+
+
+def test_studio_page_forwards_speech_when_the_engine_is_up(monkeypatch):
+    from urllib import request as urlrequest
+
+    from shadowfetch_worker.studio import serve as studio_serve
+
+    wav = b"RIFF" + b"\x00" * 12 + b"WAVEfmt "
+
+    class Engine(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            if self.path == "/health":
+                body = json.dumps({"status": "ok", "version": "engine-test", "device": "cpu"}).encode()
+                self._send(200, body, "application/json")
+            else:
+                self._send(404, b"{}", "application/json")
+
+        def do_POST(self):  # noqa: N802
+            length = int(self.headers.get("Content-Length", "0"))
+            payload = json.loads(self.rfile.read(length))
+            assert payload["input"] == "Hello from the page"
+            self._send(200, wav, "audio/wav")
+
+        def _send(self, code, body, content_type):
+            self.send_response(code)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, fmt, *args):
+            return
+
+    engine = ThreadingHTTPServer(("127.0.0.1", 0), Engine)
+    engine_thread = threading.Thread(target=engine.serve_forever, daemon=True)
+    engine_thread.start()
+    monkeypatch.setenv("SFVS_VOICESTUDIO_UPSTREAM", f"http://127.0.0.1:{engine.server_address[1]}")
+    page = studio_serve.make_server("127.0.0.1", 0)
+    page_thread = threading.Thread(target=page.serve_forever, daemon=True)
+    page_thread.start()
+    base = f"http://127.0.0.1:{page.server_address[1]}"
+    try:
+        with urlrequest.urlopen(base + "/health", timeout=3) as response:
+            health = json.loads(response.read().decode("utf-8"))
+        assert health["voicestudio"] == "ok"
+        assert health["version"] == "engine-test"
+
+        probed = status(base)
+        assert probed["reachable"] is True
+        assert probed["message"] == "VoiceStudio is ready on this computer."
+
+        speech = urlrequest.Request(
+            base + "/v1/audio/speech",
+            data=json.dumps({"input": "Hello from the page"}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urlrequest.urlopen(speech, timeout=3) as response:
+            assert response.read() == wav
+            assert "audio/wav" in response.headers.get("Content-Type", "")
+    finally:
+        page.shutdown()
+        engine.shutdown()
+        page_thread.join(timeout=2)
+        engine_thread.join(timeout=2)
+
+
 def test_studio_methods_are_registered(app):
     import shadowfetch_worker.jobs.studio  # noqa: F401
     from shadowfetch_worker.rpc import registry
