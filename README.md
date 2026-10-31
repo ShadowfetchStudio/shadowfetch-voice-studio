@@ -114,4 +114,8 @@ Local storage is **not** encrypted. Treat the data directory like any other priv
 - [docs/TEST_REPORT.md](docs/TEST_REPORT.md)
 - [docs/screenshots/](docs/screenshots/) — UI layout (browser preview mock)
 
+Project page: [shadowfetchlinux.org/open-source/projects/shadowfetch-voice-studio](https://www.shadowfetchlinux.org/open-source/projects/shadowfetch-voice-studio)
+
+Like this project? You can [buy me a coffee](https://www.buymeacoffee.com/shadowfetcu).
+
 License: [MIT](LICENSE).
